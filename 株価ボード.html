@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>株価ボード</title>
+
+<style>
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: #14171F;
+  color: #EDEDE6;
+  font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", system-ui, sans-serif;
+}
+
+button, input, textarea { font-family: inherit; }
+
+#app {
+  min-height: 100vh;
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 20px 16px 40px;
+}
+
+.title { font-size: 22px; font-weight: 800; letter-spacing: 1px; }
+.date-row { display:flex; align-items:center; gap:8px; margin-top:4px; }
+.date { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:13px; color:#8B92A3; }
+.status-dot { width:6px; height:6px; border-radius:50%; }
+
+.record-btn {
+  width:100%; margin-top:16px; margin-bottom:10px;
+  background:#C9A227; color:#14171F; border:none; border-radius:10px;
+  padding:13px 16px; font-size:14px; font-weight:700; cursor:pointer;
+}
+
+.manage-btn {
+  background:transparent; border:1px solid #2C313D; color:#8B92A3;
+  border-radius:8px; padding:8px 14px; font-size:12.5px; cursor:pointer;
+}
+
+.small-btn {
+  background:#C9A227; color:#14171F; border:none; border-radius:6px;
+  padding:8px 12px; font-size:12.5px; font-weight:700; cursor:pointer;
+}
+
+.link-btn {
+  background:transparent; border:none; color:#C9A227; font-size:11.5px;
+  cursor:pointer; display:flex; align-items:center; gap:4px; padding:0;
+}
+
+.list { display:flex; flex-direction:column; gap:8px; }
+
+.card {
+  display:flex; align-items:center; background:#1B1F29;
+  border:1px solid #2C313D; border-radius:10px; padding:12px; cursor:pointer;
+}
+
+.card-left { flex:1; min-width:0; }
+.code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:11px; color:#8B92A3; letter-spacing:1px; }
+.name { font-size:14px; font-weight:600; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.price-area { text-align:right; margin-right:4px; }
+.price { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:16px; font-weight:700; }
+.change { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:11.5px; margin-top:2px; }
+
+.up { color:#D0453A; }
+.down { color:#3D8BC4; }
+.dim { color:#8B92A3; }
+
+.icon-btn { background:transparent; border:none; padding:6px; cursor:pointer; color:#8B92A3; font-size:14px; }
+.reorder-btn { background:transparent; border:none; cursor:pointer; padding:0; color:#8B92A3; font-size:9px; line-height:13px; height:13px; display:block; }
+
+.overlay {
+  position:fixed; inset:0; background:rgba(0,0,0,0.6);
+  display:flex; align-items:center; justify-content:center; padding:20px; z-index:50;
+}
+
+.modal {
+  background:#1B1F29; border:1px solid #2C313D; border-radius:12px;
+  padding:18px; width:100%; max-width:380px; max-height:80vh; overflow-y:auto;
+}
+
+.input {
+  background:#232833; border:1px solid #2C313D; color:#EDEDE6;
+  border-radius:6px; padding:8px 10px; font-size:13px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  width:100%;
+}
+
+textarea.input { resize:vertical; height:110px; }
+
+.manage-list { margin-top:12px; display:flex; flex-direction:column; gap:6px; }
+.manage-item { display:flex; align-items:center; background:#1B1F29; border:1px solid #2C313D; border-radius:8px; padding:8px 10px; }
+
+.add-btn {
+  display:flex; justify-content:center; align-items:center; background:transparent;
+  border:1px dashed #2C313D; color:#C9A227; border-radius:8px; padding:10px; cursor:pointer; width:100%;
+}
+
+.detail-code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:11px; color:#8B92A3; }
+.detail-name { font-size:18px; font-weight:800; }
+.detail-price-row { display:flex; align-items:baseline; gap:12px; margin-top:6px; }
+.detail-price { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:30px; font-weight:800; }
+.change-tag { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:13px; font-weight:700; }
+
+.chart-box { margin-top:20px; height:220px; }
+svg.chart { width:100%; height:100%; }
+
+.section-label { font-size:12px; color:#8B92A3; margin-top:24px; margin-bottom:8px; letter-spacing:1px; }
+.history-row { display:flex; justify-content:space-between; background:#1B1F29; border:1px solid #2C313D; border-radius:6px; padding:8px 10px; margin-bottom:4px; }
+
+.note { font-size:11.5px; color:#8B92A3; line-height:1.6; margin-bottom:14px; }
+.error-note { font-size:12px; color:#D0453A; margin-bottom:8px; line-height:1.5; }
+.paste-help { color:#8B92A3; font-size:11px; margin-bottom:6px; line-height:1.5; }
+</style>
+</head>
+
+<body>
+<div id="app"></div>
+
+<script>
+// ==========================
+// 初期データ・状態
+// ==========================
+
+const DEFAULT_TICKERS = [
+  { code:"8306", name:"三菱UFJフィナンシャル・グループ" },
+  { code:"8630", name:"SOMPOホールディングス" },
+  { code:"9501", name:"東京電力ホールディングス" },
+  { code:"2157", name:"コシダカホールディングス" },
+  { code:"2127", name:"日本M&Aセンターホールディングス" },
+  { code:"6227", name:"AIメカテック" },  
+  { code:"4212", name:"積水樹脂" },
+  { code:"1414", name:"ショーボンドホールディングス" },
+  { code:"9697", name:"カプコン" },
+  { code:"6758", name:"ソニーグループ" },
+];
+
+let tickers, daily;
+try { tickers = JSON.parse(localStorage.getItem("tickers")) || DEFAULT_TICKERS; }
+catch (e) { tickers = DEFAULT_TICKERS; }
+try { daily = JSON.parse(localStorage.getItem("daily")) || {}; }
+catch (e) { daily = {}; }
+
+let view = "board";          // 'board' | 'detail' | 'manage'
+let detailCode = null;
+let pasteModeOpen = false;   // 入力モーダル内の一括貼り付け欄
+let codePasteOpen = false;   // 管理画面のコード一括貼り付け欄
+let addFormOpen = false;     // 管理画面の単体追加フォーム
+let lastSaveFailed = false;
+
+function escapeHtml(s) {
+  return String(s ?? "").replace(/[&<>"']/g, c => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[c]));
+}
+
+function todayInfo() {
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat("ja-JP", {
+    timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit", weekday: "short"
+  }).formatToParts(now);
+  const y = parts.find(p => p.type === "year").value;
+  const m = parts.find(p => p.type === "month").value;
+  const d = parts.find(p => p.type === "day").value;
+  const wd = parts.find(p => p.type === "weekday").value;
+  return { key: `${y}-${m}-${d}`, label: `${y}.${m}.${d} (${wd})` };
+}
+
+function save() {
+  try {
+    localStorage.setItem("tickers", JSON.stringify(tickers));
+    localStorage.setItem("daily", JSON.stringify(daily));
+    lastSaveFailed = false;
+  } catch (e) {
+    lastSaveFailed = true;
+  }
+}
+
+function sortedDates() { return Object.keys(daily).sort(); }
+function latestDate() { const d = sortedDates(); return d[d.length - 1]; }
+function latestEntries() { const d = latestDate(); return d ? (daily[d] || []) : []; }
+function prevDate() { const d = sortedDates(); return d.length >= 2 ? d[d.length - 2] : null; }
+
+function pct(change, price) {
+  if (change == null || price == null) return null;
+  const prev = price - change;
+  if (!prev) return null;
+  return (change / prev) * 100;
+}
+
+// ==========================
+// ボード画面
+// ==========================
+
+function render() {
+  const app = document.getElementById("app");
+  if (view === "detail") { renderDetail(app); return; }
+  if (view === "manage") { renderManage(app); return; }
+  renderBoard(app);
+}
+
+function renderBoard(app) {
+  const today = todayInfo();
+  const recordedToday = latestDate() === today.key;
+  const latest = latestEntries();
+  const prevD = prevDate();
+  const prevEntries = prevD ? (daily[prevD] || []) : [];
+
+  let html = `
+    <div class="title">株価ボード</div>
+    <div class="date-row">
+      <span class="date">${today.label}</span>
+      <span class="status-dot" style="background:${recordedToday ? '#D0453A' : '#8B92A3'}"></span>
+    </div>
+  `;
+
+  if (lastSaveFailed) {
+    html += `<div class="error-note">保存に失敗した可能性があります。ブラウザのプライベートモードやストレージ容量をご確認のうえ、もう一度お試しください。</div>`;
+  }
+
+  html += `
+    <button class="record-btn" onclick="openInput()">${recordedToday ? "本日分を修正する" : "本日の株価を記録する"}</button>
+    <div class="note">証券口座アプリなどで確認した終値を入力してください。前回入力した値が自動で入っているので、変わった銘柄だけ書き換えればOKです。</div>
+    <div class="list">
+  `;
+
+  tickers.forEach(t => {
+    const e = latest.find(x => x.code === t.code);
+    const prevE = prevEntries.find(x => x.code === t.code);
+    let change = e && e.change != null ? e.change : null;
+    if (change == null && e && prevE && e.price != null && prevE.price != null) {
+      change = e.price - prevE.price;
+    }
+    const price = e ? e.price : null;
+    const cp = pct(change, price);
+    const up = change != null && change >= 0;
+
+    html += `
+      <div class="card" onclick="openDetail('${t.code}')">
+        <div class="card-left">
+          <div class="code">${escapeHtml(t.code)}</div>
+          <div class="name">${escapeHtml(t.name || t.code)}</div>
+        </div>
+        <div class="price-area">
+          <div class="price">${price != null ? "¥" + price.toLocaleString("ja-JP") : "未記録"}</div>
+          <div class="change ${change == null ? 'dim' : (up ? 'up' : 'down')}">
+            ${change != null
+              ? (up ? "▲ " : "▼ ") + Math.abs(change).toLocaleString("ja-JP") + (cp != null ? ` (${Math.abs(cp).toFixed(2)}%)` : "")
+              : "—"}
+          </div>
+        </div>
+        <button class="icon-btn" onclick="event.stopPropagation(); openQuickEdit('${t.code}')" aria-label="手動で価格を入力">✎</button>
+      </div>
+    `;
+  });
+
+  html += `
+    </div>
+    <div style="text-align:center;margin-top:18px">
+      <button class="manage-btn" onclick="view='manage'; render()">銘柄を編集</button>
+    </div>
+  `;
+
+  app.innerHTML = html;
+}
+
+// ==========================
+// 本日の株価入力(一括貼り付け対応)
+// ==========================
+
+function openInput() {
+  const today = todayInfo();
+  const latest = latestEntries();
+  pasteModeOpen = false;
+
+  let rows = "";
+  tickers.forEach(t => {
+    const e = latest.find(x => x.code === t.code);
+    const val = e && e.price != null ? e.price : "";
+    rows += `
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <div style="width:96px;flex-shrink:0">
+          <div class="code">${escapeHtml(t.code)}</div>
+          <div style="font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(t.name || t.code)}</div>
+        </div>
+        <input class="input" id="p_${t.code}" value="${escapeHtml(val)}" inputmode="decimal" placeholder="円">
+      </div>
+    `;
+  });
+
+  document.getElementById("app").innerHTML = `
+    <div class="overlay" onclick="if(event.target===this){view='board';render();}">
+      <div class="modal" onclick="event.stopPropagation()">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">
+          <div style="font-size:15px;font-weight:700">${today.label} の株価を入力</div>
+          <button class="link-btn" onclick="togglePasteMode()">📋 まとめて貼り付け</button>
+        </div>
+        <div class="note" style="margin-bottom:14px">変わっていない銘柄はそのままでOK</div>
+
+        <div id="pasteArea"></div>
+
+        <div id="inputRows">${rows}</div>
+
+        <div style="display:flex;gap:8px;margin-top:16px">
+          <button class="small-btn" style="flex:1" onclick="savePrices()">記録する</button>
+          <button class="manage-btn" style="flex:1" onclick="view='board';render()">キャンセル</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function togglePasteMode() {
+  pasteModeOpen = !pasteModeOpen;
+  const area = document.getElementById("pasteArea");
+  if (!pasteModeOpen) { area.innerHTML = ""; return; }
+  area.innerHTML = `
+    <div style="margin-bottom:14px">
+      <div class="paste-help">「8306,3600」のように1行1銘柄で貼り付けるか、証券コードなしで価格だけを今の銘柄の並び順(上から)で1行ずつ貼り付けてください</div>
+      <textarea class="input" id="bulkPasteText" placeholder="3600&#10;6584&#10;503.1&#10;..."></textarea>
+      <button class="small-btn" style="width:100%;margin-top:8px" onclick="applyBulkPaste()">下の欄に反映する</button>
+    </div>
+  `;
+}
+
+function applyBulkPaste() {
+  const text = document.getElementById("bulkPasteText").value;
+  const rawLines = text.split("\n").map(l => l.trim()).filter(Boolean);
+  const looksLikeCodePairs = rawLines.some(line => {
+    const parts = line.split(/[,\s\t]+/).filter(Boolean);
+    return parts.length >= 2 && tickers.some(t => t.code === parts[0]);
+  });
+
+  if (looksLikeCodePairs) {
+    rawLines.forEach(line => {
+      const parts = line.split(/[,\s\t]+/).filter(Boolean);
+      if (parts.length >= 2) {
+        const code = parts[0].trim();
+        const price = parts[1].replace(/[^0-9.]/g, "").trim();
+        if (tickers.some(t => t.code === code) && price) {
+          const input = document.getElementById("p_" + code);
+          if (input) input.value = price;
+        }
+      }
+    });
+  } else {
+    rawLines.forEach((line, i) => {
+      if (i >= tickers.length) return;
+      const price = line.replace(/[^0-9.]/g, "").trim();
+      if (price) {
+        const input = document.getElementById("p_" + tickers[i].code);
+        if (input) input.value = price;
+      }
+    });
+  }
+
+  pasteModeOpen = false;
+  document.getElementById("pasteArea").innerHTML = "";
+}
+
+function savePrices() {
+  const today = todayInfo();
+  const prev = latestEntries();
+  const results = tickers.map(t => {
+    const raw = document.getElementById("p_" + t.code).value;
+    const price = raw !== "" ? parseFloat(raw) : null;
+    const old = prev.find(x => x.code === t.code);
+    const change = (price != null && old && old.price != null) ? price - old.price : null;
+    return { code: t.code, name: t.name || t.code, price: Number.isNaN(price) ? null : price, change, asOf: today.key };
+  });
+  daily[today.key] = results;
+  save();
+  view = "board";
+  render();
+}
+
+function openQuickEdit(code) {
+  const t = tickers.find(x => x.code === code);
+  const dateKey = latestDate() || todayInfo().key;
+  const current = (daily[dateKey] || []).find(x => x.code === code);
+  const val = current && current.price != null ? current.price : "";
+
+  document.getElementById("app").insertAdjacentHTML("beforeend", `
+    <div class="overlay" id="quickEditOverlay" onclick="if(event.target===this) this.remove();">
+      <div class="modal" style="max-width:320px" onclick="event.stopPropagation()">
+        <div style="margin-bottom:10px">${escapeHtml(t ? (t.name || t.code) : code)} の価格を入力</div>
+        <input class="input" id="quickEditInput" value="${escapeHtml(val)}" inputmode="decimal" style="margin-bottom:12px">
+        <div style="display:flex;gap:8px">
+          <button class="small-btn" style="flex:1" onclick="saveQuickEdit('${code}')">保存</button>
+          <button class="manage-btn" style="flex:1" onclick="document.getElementById('quickEditOverlay').remove()">キャンセル</button>
+        </div>
+      </div>
+    </div>
+  `);
+}
+
+function saveQuickEdit(code) {
+  const raw = document.getElementById("quickEditInput").value;
+  const val = parseFloat(raw);
+  if (Number.isNaN(val)) { document.getElementById("quickEditOverlay").remove(); return; }
+  const dateKey = latestDate() || todayInfo().key;
+  const current = daily[dateKey] || [];
+  const idx = current.findIndex(e => e.code === code);
+  let updated;
+  if (idx >= 0) {
+    updated = current.map(e => e.code === code ? { ...e, price: val } : e);
+  } else {
+    const t = tickers.find(x => x.code === code);
+    updated = [...current, { code, name: t ? t.name : code, price: val, change: null, asOf: dateKey }];
+  }
+  daily[dateKey] = updated;
+  save();
+  document.getElementById("quickEditOverlay").remove();
+  render();
+}
+
+// ==========================
+// 詳細画面
+// ==========================
+
+function openDetail(code) {
+  detailCode = code;
+  view = "detail";
+  render();
+}
+
+function renderDetail(app) {
+  const t = tickers.find(x => x.code === detailCode);
+  const latest = latestEntries();
+  const e = latest.find(x => x.code === detailCode);
+  const prevD = prevDate();
+  const prevE = prevD ? (daily[prevD] || []).find(x => x.code === detailCode) : null;
+  let change = e && e.change != null ? e.change : null;
+  if (change == null && e && prevE && e.price != null && prevE.price != null) {
+    change = e.price - prevE.price;
+  }
+  const price = e ? e.price : null;
+  const cp = pct(change, price);
+  const up = change != null && change >= 0;
+
+  const hist = sortedDates()
+    .map(d => {
+      const x = (daily[d] || []).find(y => y.code === detailCode);
+      return x && x.price != null ? { date: d.slice(5), price: x.price } : null;
+    })
+    .filter(Boolean);
+
+  app.innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+      <button class="icon-btn" style="font-size:18px" onclick="view='board';render()">←</button>
+      <div>
+        <div class="detail-code">${escapeHtml(t.code)}</div>
+        <div class="detail-name">${escapeHtml(t.name || t.code)}</div>
+      </div>
+    </div>
+
+    <div class="detail-price-row">
+      <span class="detail-price">${price != null ? "¥" + price.toLocaleString("ja-JP") : "—"}</span>
+      ${change != null ? `<span class="change-tag ${up ? 'up' : 'down'}">${up ? "▲" : "▼"} ${Math.abs(change).toLocaleString("ja-JP")}${cp != null ? ` (${up ? "+" : "-"}${Math.abs(cp).toFixed(2)}%)` : ""}</span>` : ""}
+    </div>
+
+    <div class="chart-box">${drawChart(hist)}</div>
+
+    <div class="section-label">記録履歴</div>
+    ${hist.slice().reverse().map(x => `
+      <div class="history-row">
+        <span class="dim" style="font-size:12px">${x.date}</span>
+        <span class="code" style="font-size:13px;color:#EDEDE6">¥${x.price.toLocaleString("ja-JP")}</span>
+      </div>
+    `).join("")}
+  `;
+}
+
+function drawChart(data) {
+  if (data.length < 2) {
+    return `<div class="dim" style="font-size:13px;text-align:center;padding-top:60px">記録が2日分たまるとグラフが表示されます</div>`;
+  }
+  const max = Math.max(...data.map(x => x.price));
+  const min = Math.min(...data.map(x => x.price));
+  const range = max - min || 1;
+  const points = data.map((x, i) => {
+    const px = (i / (data.length - 1)) * 380 + 10;
+    const py = 200 - ((x.price - min) / range) * 180 + 10;
+    return `${px},${py}`;
+  }).join(" ");
+
+  return `
+    <svg class="chart" viewBox="0 0 400 220">
+      <polyline points="${points}" fill="none" stroke="#C9A227" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" />
+    </svg>
+  `;
+}
+
+// ==========================
+// 銘柄編集
+// ==========================
+
+function renderManage(app) {
+  let html = `
+    <div class="title">銘柄を編集</div>
+    <div class="manage-list">
+      <button class="add-btn" onclick="toggleCodePaste()">📋 コードをまとめて貼り付けて並び替え</button>
+      <div id="codePasteArea"></div>
+  `;
+
+  tickers.forEach((t, i) => {
+    html += `
+      <div class="manage-item">
+        <div style="display:flex;flex-direction:column;margin-right:4px">
+          <button class="reorder-btn" onclick="moveTicker(${i},-1)" ${i === 0 ? "disabled style='opacity:.3'" : ""}>▲</button>
+          <button class="reorder-btn" onclick="moveTicker(${i},1)" ${i === tickers.length - 1 ? "disabled style='opacity:.3'" : ""}>▼</button>
+        </div>
+        <span class="code">${escapeHtml(t.code)}</span>
+        <input class="input" value="${escapeHtml(t.name)}" id="n_${t.code}"
+          onblur="updateTickerName('${t.code}', this.value)"
+          placeholder="会社名を入力" style="flex:1;margin-left:10px;border:none;background:transparent;padding:2px 4px">
+        <button class="icon-btn" onclick="removeTicker('${t.code}')" aria-label="削除" style="color:#D0453A">×</button>
+      </div>
+    `;
+  });
+
+  html += `<div id="addTickerArea"></div>`;
+  html += `
+    </div>
+    <div style="text-align:center;margin-top:16px">
+      <button class="manage-btn" onclick="view='board';render()">完了</button>
+    </div>
+  `;
+
+  app.innerHTML = html;
+  renderAddTickerArea();
+}
+
+function renderAddTickerArea() {
+  const area = document.getElementById("addTickerArea");
+  if (!addFormOpen) {
+    area.innerHTML = `<button class="add-btn" onclick="addFormOpen=true;renderAddTickerArea()">＋ 銘柄を追加</button>`;
+    return;
+  }
+  area.innerHTML = `
+    <div class="manage-item" style="flex-direction:column;align-items:stretch;gap:8px">
+      <div style="display:flex;gap:8px">
+        <input class="input" id="newCode" placeholder="証券コード4桁" style="width:110px" maxlength="4">
+        <input class="input" id="newName" placeholder="会社名（任意）" style="flex:1">
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="small-btn" style="flex:1" onclick="addTicker()">追加</button>
+        <button class="manage-btn" style="flex:1" onclick="addFormOpen=false;renderAddTickerArea()">キャンセル</button>
+      </div>
+    </div>
+  `;
+}
+
+function addTicker() {
+  const code = document.getElementById("newCode").value.replace(/[^0-9]/g, "").slice(0, 4);
+  const name = document.getElementById("newName").value.trim();
+  if (!/^[0-9]{4}$/.test(code)) return;
+  if (tickers.some(t => t.code === code)) { addFormOpen = false; renderManage(document.getElementById("app")); return; }
+  tickers = [...tickers, { code, name }];
+  save();
+  addFormOpen = false;
+  renderManage(document.getElementById("app"));
+}
+
+function removeTicker(code) {
+  tickers = tickers.filter(t => t.code !== code);
+  save();
+  renderManage(document.getElementById("app"));
+}
+
+function moveTicker(index, direction) {
+  const target = index + direction;
+  if (target < 0 || target >= tickers.length) return;
+  const next = [...tickers];
+  [next[index], next[target]] = [next[target], next[index]];
+  tickers = next;
+  save();
+  renderManage(document.getElementById("app"));
+}
+
+function updateTickerName(code, name) {
+  const trimmed = name.trim();
+  const t = tickers.find(x => x.code === code);
+  if (!t || t.name === trimmed) return;
+  tickers = tickers.map(x => x.code === code ? { ...x, name: trimmed } : x);
+  save();
+}
+
+function toggleCodePaste() {
+  codePasteOpen = !codePasteOpen;
+  const area = document.getElementById("codePasteArea");
+  if (!codePasteOpen) { area.innerHTML = ""; return; }
+  area.innerHTML = `
+    <div class="manage-item" style="flex-direction:column;align-items:stretch;gap:8px">
+      <div class="paste-help">証券コードを1行に1つ、上から順に貼り付けてください。この並び順がそのままボードの表示順になります。すでに記録がある銘柄はそのまま履歴が引き継がれます。</div>
+      <textarea class="input" id="codePasteText" placeholder="8306&#10;8630&#10;9501&#10;..."></textarea>
+      <div style="display:flex;gap:8px">
+        <button class="small-btn" style="flex:1" onclick="applyCodePaste()">反映する</button>
+        <button class="manage-btn" style="flex:1" onclick="codePasteOpen=false;document.getElementById('codePasteArea').innerHTML=''">キャンセル</button>
+      </div>
+    </div>
+  `;
+}
+
+function applyCodePaste() {
+  const text = document.getElementById("codePasteText").value;
+  const lines = text.split("\n").map(l => l.trim()).filter(Boolean);
+  const codes = [];
+  lines.forEach(line => {
+    const m = line.match(/[0-9]{4}/);
+    if (m && !codes.includes(m[0])) codes.push(m[0]);
+  });
+  if (!codes.length) return;
+  tickers = codes.map(code => tickers.find(t => t.code === code) || { code, name: "" });
+  save();
+  codePasteOpen = false;
+  renderManage(document.getElementById("app"));
+}
+
+// ==========================
+// 起動
+// ==========================
+
+render();
+</script>
+</body>
+</html>
