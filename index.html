@@ -130,8 +130,8 @@ const DEFAULT_TICKERS = [
   { code:"9501", name:"東京電力ホールディングス" },
   { code:"2157", name:"コシダカホールディングス" },
   { code:"2127", name:"日本M&Aセンターホールディングス" },
-  { code:"6227", name:"AIメカテック" },  
   { code:"4212", name:"積水樹脂" },
+  { code:"9716", name:"乃村工藝社" },
   { code:"1414", name:"ショーボンドホールディングス" },
   { code:"9697", name:"カプコン" },
   { code:"6758", name:"ソニーグループ" },
@@ -204,9 +204,6 @@ function render() {
 function renderBoard(app) {
   const today = todayInfo();
   const recordedToday = latestDate() === today.key;
-  const latest = latestEntries();
-  const prevD = prevDate();
-  const prevEntries = prevD ? (daily[prevD] || []) : [];
 
   let html = `
     <div class="title">株価ボード</div>
@@ -227,13 +224,12 @@ function renderBoard(app) {
   `;
 
   tickers.forEach(t => {
-    const e = latest.find(x => x.code === t.code);
-    const prevE = prevEntries.find(x => x.code === t.code);
-    let change = e && e.change != null ? e.change : null;
-    if (change == null && e && prevE && e.price != null && prevE.price != null) {
-      change = e.price - prevE.price;
-    }
-    const price = e ? e.price : null;
+    const histForT = sortedDates()
+      .map(d => (daily[d] || []).find(x => x.code === t.code))
+      .filter(e => e && e.price != null);
+    const price = histForT.length ? histForT[histForT.length - 1].price : null;
+    const firstPrice = histForT.length ? histForT[0].price : null;
+    const change = histForT.length >= 2 ? price - firstPrice : null;
     const cp = pct(change, price);
     const up = change != null && change >= 0;
 
@@ -376,6 +372,7 @@ function savePrices() {
   render();
 }
 
+// 1銘柄だけ素早く修正する簡易モーダル
 function openQuickEdit(code) {
   const t = tickers.find(x => x.code === code);
   const dateKey = latestDate() || todayInfo().key;
@@ -428,17 +425,6 @@ function openDetail(code) {
 
 function renderDetail(app) {
   const t = tickers.find(x => x.code === detailCode);
-  const latest = latestEntries();
-  const e = latest.find(x => x.code === detailCode);
-  const prevD = prevDate();
-  const prevE = prevD ? (daily[prevD] || []).find(x => x.code === detailCode) : null;
-  let change = e && e.change != null ? e.change : null;
-  if (change == null && e && prevE && e.price != null && prevE.price != null) {
-    change = e.price - prevE.price;
-  }
-  const price = e ? e.price : null;
-  const cp = pct(change, price);
-  const up = change != null && change >= 0;
 
   const hist = sortedDates()
     .map(d => {
@@ -446,6 +432,12 @@ function renderDetail(app) {
       return x && x.price != null ? { date: d.slice(5), price: x.price } : null;
     })
     .filter(Boolean);
+
+  const price = hist.length ? hist[hist.length - 1].price : null;
+  const firstPrice = hist.length ? hist[0].price : null;
+  const change = hist.length >= 2 ? price - firstPrice : null;
+  const cp = pct(change, price);
+  const up = change != null && change >= 0;
 
   app.innerHTML = `
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
@@ -494,7 +486,7 @@ function drawChart(data) {
 }
 
 // ==========================
-// 銘柄編集
+// 銘柄編集(並び替え・一括コード貼り付け・追加・削除・名前編集)
 // ==========================
 
 function renderManage(app) {
@@ -586,6 +578,7 @@ function updateTickerName(code, name) {
   if (!t || t.name === trimmed) return;
   tickers = tickers.map(x => x.code === code ? { ...x, name: trimmed } : x);
   save();
+  // 入力中のフォーカスを崩さないよう、名前欄以外は再描画しない
 }
 
 function toggleCodePaste() {
